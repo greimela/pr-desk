@@ -11,7 +11,7 @@ REVIEW_LABELS={}
 def configure():
  global REPOS, AUTHOR, PORT, INTERVAL, REVIEW_LABELS
  parser=argparse.ArgumentParser(description='Local GitHub PR dashboard. Requires gh auth login.')
- parser.add_argument('--repo',action='append',help='owner/repository; repeat for multiple tabs')
+ parser.add_argument('--repo',action='append',help='owner/repository; repeat to restrict auto-discovery')
  parser.add_argument('--author',help='GitHub login; defaults to the authenticated user')
  parser.add_argument('--config',default=str(ROOT/'config.json'))
  parser.add_argument('--port',type=int,default=int(os.environ.get('PORT','8765')))
@@ -20,8 +20,8 @@ def configure():
  try:
   config=json.loads(path.read_text()) if path.exists() else {}
   REPOS=list(dict.fromkeys(args.repo or config.get('repos',[])))
-  if not REPOS or any(not isinstance(r,str) or not re.fullmatch(r'[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+',r) for r in REPOS):
-   parser.error('Specify at least one --repo owner/name or add repos to config.json.')
+  if any(not isinstance(r,str) or not re.fullmatch(r'[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+',r) for r in REPOS):
+   parser.error('repos must use the owner/name format')
   AUTHOR=args.author or config.get('author') or None
   if AUTHOR and not re.fullmatch(r'[A-Za-z0-9-]+',AUTHOR): parser.error('author must be a GitHub login')
   INTERVAL=int(config.get('refresh_seconds',60))
@@ -65,6 +65,9 @@ def check_state(c):
  if value=='SUCCESS': return 'passed'
  if value in ('NEUTRAL','SKIPPED'): return 'neutral'
  return 'unknown'
+def discover_repositories(login):
+ results=gh('search','prs','--author',login,'--state','open','--limit','1000','--json','repository')
+ return sorted({p['repository']['nameWithOwner'] for p in results if p.get('repository',{}).get('nameWithOwner')})
 def collect_repository(repo,login):
  fields='number,title,headRefName,headRepositoryOwner,headRepository,baseRefName,reviewDecision,statusCheckRollup,isDraft,mergeable,mergeStateStatus,updatedAt,createdAt,url,additions,deletions,changedFiles,reviewRequests,reviews,comments'
  prs=gh('pr','list','--repo',repo,'--author',login,'--state','open','--limit','10000','--json',fields)
@@ -93,11 +96,12 @@ def refresh():
   CACHE['refreshing']=True
  try:
   login=AUTHOR or gh('api','user')['login']
+  repos=REPOS or discover_repositories(login)
   with LOCK: previous=CACHE['data']
   old={r['name']:r for r in (previous or {}).get('repositories',[])} if previous and previous['login']==login else {}
   repositories=[]
   with concurrent.futures.ThreadPoolExecutor(max_workers=3) as pool:
-   futures={repo:pool.submit(collect_repository,repo,login) for repo in REPOS}
+   futures={repo:pool.submit(collect_repository,repo,login) for repo in repos}
    for repo,future in futures.items():
     try: repositories.append({'name':repo,'prs':future.result(),'error':None,'updatedAt':time.time()})
     except Exception as e: repositories.append(dict(old.get(repo,{'name':repo,'prs':[],'updatedAt':None}),error=str(e)))

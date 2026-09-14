@@ -1,5 +1,4 @@
 {
-  "repos": ["owner/repository", "owner/another-repository"],
   "refresh_seconds": 60,
   "review_labels": {}
 }
