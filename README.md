@@ -7,14 +7,20 @@ A local, read-only dashboard for your open GitHub pull requests, with one tab pe
 Sign in with `gh auth login`, then run:
 
 ```sh
-python3 server.py --repo owner/repository --repo owner/another-repository
+python3 server.py
 ```
 
 On Windows, use `python` or `py -3` instead of `python3`.
 
-Open http://127.0.0.1:8765. By default, PR desk shows PRs authored by the signed-in GitHub user. To view another author, add `--author username`. To change the port, add `--port 9000` or set `PORT`.
+Open http://127.0.0.1:8765. PR desk automatically discovers repositories containing open PRs authored by the signed-in GitHub user. Discovery runs on every refresh, so repositories appear and disappear as PRs are opened and closed. To view another author, add `--author username`. To change the port, add `--port 9000` or set `PORT`.
 
-For saved settings, copy `config.example.json` to `config.json` and replace the example repositories. Then run `python3 server.py`. This personal config is ignored by Git. `--repo` and `--author` override saved values. Use `--config path/to/config.json` for another config file.
+To restrict the dashboard to specific repositories, repeat `--repo`:
+
+```sh
+python3 server.py --repo owner/repository --repo owner/another-repository
+```
+
+For saved settings, copy `config.example.json` to `config.json`. This personal config is ignored by Git. If `repos` is omitted or empty, repositories are auto-discovered. `--repo` and `--author` override saved values. Use `--config path/to/config.json` for another config file.
 
 ```json
 {
@@ -26,11 +32,11 @@ For saved settings, copy `config.example.json` to `config.json` and replace the 
 }
 ```
 
-`author` is optional. Omit it to follow the signed-in account. The refresh interval must be at least 30 seconds. Team review requests use their team names by default; `review_labels` can shorten them per repository. The existing ent-wallet personal config maps `actions-reviewers` to `IPS`.
+`repos` and `author` are optional. Omit `repos` to auto-discover repositories and omit `author` to follow the signed-in account. The refresh interval must be at least 30 seconds. Team review requests use their team names by default; `review_labels` can shorten them per repository. The existing ent-wallet personal config maps `actions-reviewers` to `IPS`.
 
 ## Behavior
 
-- Each repository has its own tab, PR count, errors, and last successful data. An inaccessible repo does not stop the others loading.
+- The default All tab consolidates every PR. Repository tabs filter the list and show per-repository counts and errors. An inaccessible repo does not stop the others loading.
 - Click a row to inspect checks, reviews, and discussions. Title links open GitHub.
 - PRs are grouped into stacks when a PR targets another listed PR's branch in the same repository. Children appear below parents; stacks sort by their latest update. Filters show only matching PRs.
 - Individual approvals appear even if a requested team review is still pending. Dismissed approvals are excluded; changes requested take precedence.
