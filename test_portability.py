@@ -3,6 +3,23 @@ from unittest.mock import patch
 import server
 
 class PortabilityTests(unittest.TestCase):
+ def test_discovers_unique_repositories_with_open_prs(self):
+  results=[
+   {'repository':{'nameWithOwner':'two/repo'}},
+   {'repository':{'nameWithOwner':'one/repo'}},
+   {'repository':{'nameWithOwner':'two/repo'}},
+  ]
+  with patch.object(server,'gh',return_value=results) as gh:
+   self.assertEqual(server.discover_repositories('alice'),['one/repo','two/repo'])
+  gh.assert_called_once_with('search','prs','--author','alice','--state','open','--limit','1000','--json','repository')
+ def test_refresh_discovers_repositories_when_unconfigured(self):
+  server.REPOS=[];server.AUTHOR='alice'
+  server.CACHE.update(data=None,refreshing=False,error=None)
+  with patch.object(server,'discover_repositories',return_value=['one/repo']) as discover:
+   with patch.object(server,'collect_repository',return_value=[{'number':4,'repo':'one/repo'}]):
+    server.refresh()
+  discover.assert_called_once_with('alice')
+  self.assertEqual(server.CACHE['data']['repositories'][0]['name'],'one/repo')
  def test_repo_failure_preserves_only_its_snapshot(self):
   server.REPOS=['one/repo','two/repo'];server.AUTHOR='alice'
   server.CACHE.update(data={'login':'alice','repositories':[{'name':'two/repo','prs':[{'number':4}],'updatedAt':1,'error':None}]},refreshing=False,error=None)
