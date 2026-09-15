@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """Read-only, loopback PR dashboard. Python 3 + authenticated gh CLI."""
-import argparse, concurrent.futures, json, os, pathlib, re, subprocess, threading, time
+import argparse, concurrent.futures, json, mimetypes, os, pathlib, re, subprocess, threading, time
 from http.server import ThreadingHTTPServer, BaseHTTPRequestHandler
 from urllib.parse import urlparse
 ROOT=pathlib.Path(__file__).parent
@@ -121,10 +121,13 @@ class Handler(BaseHTTPRequestHandler):
   if path=='/api/status':
    with LOCK: body=json.dumps(CACHE).encode()
    content='application/json'
-  elif path in ('/','/app.js','/style.css','/favicon.svg'):
-   file=ROOT/'public'/('index.html' if path=='/' else path[1:]); body=file.read_bytes()
-   content={'/':'text/html','/app.js':'text/javascript','/style.css':'text/css','/favicon.svg':'image/svg+xml'}[path]
-  else: self.send_error(404); return
+  else:
+   assets=(ROOT/'dist').resolve()
+   file=(assets/('index.html' if path=='/' else path.lstrip('/'))).resolve()
+   if assets not in file.parents or not file.is_file():
+    self.send_error(404,'Frontend unavailable; run pnpm install and pnpm build' if path=='/' else 'Not found'); return
+   body=file.read_bytes()
+   content=mimetypes.guess_type(file.name)[0] or 'application/octet-stream'
   self.send_response(200); self.send_header('Content-Type',content+'; charset=utf-8'); self.send_header('Cache-Control','no-store'); self.send_header('X-Content-Type-Options','nosniff'); self.send_header('Content-Security-Policy',"default-src 'self'; style-src 'self'; script-src 'self'; img-src 'self' data:; connect-src 'self'; frame-ancestors 'none'"); self.end_headers(); self.wfile.write(body)
  def do_POST(self):
   if self.path!='/api/refresh' or self.headers.get('Origin') not in (f'http://127.0.0.1:{PORT}',f'http://localhost:{PORT}') or self.headers.get('Host') not in (f'127.0.0.1:{PORT}',f'localhost:{PORT}'):

@@ -2,3 +2,7 @@ __pycache__/
 .sites-runtime/
 *.log
 config.json
+.cursor-debug/
+node_modules/
+.pnpm-store/
+dist/

@@ -1,0 +1,33 @@
+{
+  "name": "pr-desk",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vp dev",
+    "build": "tsc --noEmit && vp build",
+    "preview": "vp preview",
+    "check": "tsc --noEmit && vp check src vite.config.ts index.html",
+    "test": "python3 -m unittest discover",
+    "test:frontend": "vp test run"
+  },
+  "devDependencies": {
+    "@tailwindcss/vite": "^4.3.3",
+    "@types/node": "^26.5.1",
+    "@types/react": "^19.3.0",
+    "@types/react-dom": "^19.3.0",
+    "@vitejs/plugin-react": "^6.1.1",
+    "tailwindcss": "^4.3.3",
+    "typescript": "^7.0.2",
+    "vite-plus": "0.3.2"
+  },
+  "engines": {
+    "node": "^20.19.0 || ^22.18.0 || >=24.11.0"
+  },
+  "packageManager": "pnpm@11.18.0",
+  "dependencies": {
+    "@tanstack/react-query": "^5.102.8",
+    "react": "^19.3.0",
+    "react-dom": "^19.3.0"
+  }
+}

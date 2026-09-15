@@ -1,0 +1,7 @@
+procs:
+  frontend:
+    cmd: [pnpm, dev]
+    cwd: <CONFIG_DIR>
+  backend:
+    cmd: [uv, tool, run, --from, watchfiles, watchfiles, --filter, python, "python3 server.py", server.py]
+    cwd: <CONFIG_DIR>
