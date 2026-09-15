@@ -65,4 +65,10 @@ Run `pnpm check` for TypeScript, formatting, and lint checks, `pnpm test:fronten
 - Failed npm/pnpm audit checks are advisory. Other failures remain red. Pending, skipped, and neutral jobs retain their own status in details.
 - General comments have no resolved state on GitHub. Unresolved review threads are counted separately, including Bugbot and human threads.
 
-GitHub.com is supported. Use a CLI account with access to the configured repos. This app does not scan local checkouts or read Cursor data. Credentials stay with `gh`; no tokens enter the frontend and no PR cache is written to disk. Keep the server local: it binds to loopback and rejects foreign Host/Origin requests. Stop it with Ctrl+C.
+GitHub.com is supported. Use a CLI account with access to the configured repos. This app does not read Cursor data. Credentials stay with `gh`; no tokens enter the frontend and no PR cache is written to disk. Keep the server local: it binds to loopback and rejects foreign Host/Origin requests. Stop it with Ctrl+C.
+
+## Checkout labels
+
+Set `"checkout_paths": ["~/code", "/path/to/a/checkout"]` in your personal `config.json` and restart the backend. Paths may point to a checkout or a directory containing checkouts as immediate children. Linked Git worktrees are included automatically. Relative paths resolve from the dashboard directory; `~` resolves to the current user's home.
+
+Matching PR rows show the checkout folder name, with the full path on hover. Matching uses the PR's source repository and branch, including forks. Detached HEADs and inaccessible paths are skipped. No checkout paths are scanned unless configured. Scanning is read-only and runs on each refresh; it does not fetch or change branches.

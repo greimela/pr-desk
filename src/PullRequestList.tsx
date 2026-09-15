@@ -44,6 +44,11 @@ function PullRequestRow({
           <span className="max-w-[310px] truncate font-mono" title={p.headRefName}>
             {p.headRefName}
           </span>
+          {p.checkouts?.map((checkout) => (
+            <span key={checkout.path} title={checkout.path}>
+              <Badge tone="blue">{checkout.name}</Badge>
+            </span>
+          ))}
           {p.isDraft && <Badge>Draft</Badge>}
           {p.mergeable === "CONFLICTING" && <Badge tone="red">Merge conflict</Badge>}
           {Date.now() - new Date(p.updatedAt).getTime() > 7 * 86400000 && (

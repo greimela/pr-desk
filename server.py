@@ -8,8 +8,9 @@ REPOS=[]
 AUTHOR=None
 INTERVAL=60
 REVIEW_LABELS={}
+CHECKOUT_PATHS=[]
 def configure():
- global REPOS, AUTHOR, PORT, INTERVAL, REVIEW_LABELS
+ global REPOS, AUTHOR, PORT, INTERVAL, REVIEW_LABELS, CHECKOUT_PATHS
  parser=argparse.ArgumentParser(description='Local GitHub PR dashboard. Requires gh auth login.')
  parser.add_argument('--repo',action='append',help='owner/repository; repeat to restrict auto-discovery')
  parser.add_argument('--author',help='GitHub login; defaults to the authenticated user')
@@ -28,6 +29,8 @@ def configure():
   if INTERVAL<30: parser.error('refresh_seconds must be at least 30')
   PORT=args.port
   if not 1<=PORT<=65535: parser.error('port must be between 1 and 65535')
+  CHECKOUT_PATHS=config.get('checkout_paths',[])
+  if not isinstance(CHECKOUT_PATHS,list) or any(not isinstance(p,str) for p in CHECKOUT_PATHS): parser.error('checkout_paths must be a list of paths')
   REVIEW_LABELS=config.get('review_labels',{})
   if not isinstance(REVIEW_LABELS,dict) or any(not isinstance(v,dict) or any(not isinstance(k,str) or not isinstance(label,str) for k,label in v.items()) for v in REVIEW_LABELS.values()):
    parser.error('review_labels must map repositories to team-slug/label objects')
@@ -90,25 +93,80 @@ def collect_repository(repo,login):
   p['pending']=sum(c['category']=='pending' for c in p['checks'])
  return prs
 
+def github_remote(remote):
+ match=re.fullmatch(r'(?:https?://github\.com/|ssh://git@github\.com/|git@github\.com:)([^/]+/[^/]+?)(?:\.git)?/?',remote.strip(),re.I)
+ return match.group(1).lower() if match else None
+
+def scan_checkouts(paths):
+ def git(path,*args):
+  result=subprocess.run(['git','--no-optional-locks','-C',str(path),*args],capture_output=True,text=True,timeout=5)
+  if result.returncode: raise RuntimeError('Git checkout unavailable')
+  return result.stdout.strip()
+ candidates=set()
+ for raw in paths:
+  path=pathlib.Path(raw).expanduser()
+  if not path.is_absolute(): path=ROOT/path
+  try:
+   candidates.add(path.resolve())
+   candidates.update(p.resolve() for p in path.iterdir() if p.is_dir() and (p/'.git').exists())
+  except OSError: pass
+ def worktrees(path):
+  try:
+   return [pathlib.Path(field[9:]).resolve() for field in git(path,'worktree','list','--porcelain','-z').split('\0') if field.startswith('worktree ')]
+  except (OSError,RuntimeError,subprocess.TimeoutExpired): return []
+ def inspect(path):
+  try:
+   branch=git(path,'symbolic-ref','--quiet','--short','HEAD')
+   remotes={github_remote(line.split(' ',1)[1]) for line in git(path,'config','--get-regexp',r'^remote\..*\.url$').splitlines() if ' ' in line}
+   return [{'repo':repo,'branch':branch,'name':path.name,'path':str(path)} for repo in sorted(remotes-{None})]
+  except (OSError,RuntimeError,subprocess.TimeoutExpired): return []
+ with concurrent.futures.ThreadPoolExecutor(max_workers=8) as pool:
+  for paths in pool.map(worktrees,list(candidates)): candidates.update(paths)
+  return [row for rows in pool.map(inspect,sorted(candidates)) for row in rows]
+
+def attach_checkouts(repositories,checkouts):
+ for repository in repositories:
+  for pr in repository['prs']:
+   head=pr.get('headRepository') or {}
+   owner=pr.get('headRepositoryOwner') or {}
+   repo=f"{owner.get('login','')}/{head.get('name','')}".lower()
+   pr['checkouts']=[{'name':c['name'],'path':c['path']} for c in checkouts if c['repo']==repo and c['branch']==pr['headRefName']]
+
 def refresh():
  with LOCK:
   if CACHE['refreshing']: return
   CACHE['refreshing']=True
  try:
+  checkout_pool=concurrent.futures.ThreadPoolExecutor(max_workers=1)
+  checkout_future=checkout_pool.submit(scan_checkouts,CHECKOUT_PATHS)
   login=AUTHOR or gh('api','user')['login']
   repos=REPOS or discover_repositories(login)
   with LOCK: previous=CACHE['data']
   old={r['name']:r for r in (previous or {}).get('repositories',[])} if previous and previous['login']==login else {}
+  discovered=set(repos)
+  if not REPOS: repos=sorted(discovered | old.keys())
   repositories=[]
   with concurrent.futures.ThreadPoolExecutor(max_workers=3) as pool:
    futures={repo:pool.submit(collect_repository,repo,login) for repo in repos}
-   for repo,future in futures.items():
-    try: repositories.append({'name':repo,'prs':future.result(),'error':None,'updatedAt':time.time()})
+   by_future={future:repo for repo,future in futures.items()}
+   for future in concurrent.futures.as_completed(by_future):
+    repo=by_future[future]
+    try:
+     prs=future.result()
+     if not REPOS and repo not in discovered and not prs: continue
+     repositories.append({'name':repo,'prs':prs,'error':None,'updatedAt':time.time()})
     except Exception as e: repositories.append(dict(old.get(repo,{'name':repo,'prs':[],'updatedAt':None}),error=str(e)))
+    completed={r['name']:r for r in repositories}
+    partial=[completed.get(name,old.get(name,{'name':name,'prs':[],'error':None,'updatedAt':None})) for name in repos]
+    if checkout_future.done(): attach_checkouts(partial,checkout_future.result())
+    with LOCK: CACHE.update(data={'login':login,'repositories':partial,'updatedAt':time.time()},error=None)
+  repositories.sort(key=lambda r:repos.index(r['name']))
+  attach_checkouts(repositories,checkout_future.result())
   with LOCK: CACHE.update(data={'login':login,'repositories':repositories,'updatedAt':time.time()},error=None)
  except Exception as e:
   with LOCK: CACHE['error']=str(e)
  finally:
+  if 'checkout_pool' in locals(): checkout_pool.shutdown(wait=False)
   with LOCK: CACHE['refreshing']=False
 
 def loop():

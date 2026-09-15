@@ -33,6 +33,7 @@ export interface ReviewThread {
   comments: { nodes: Comment[] };
 }
 export interface PullRequest {
+  checkouts?: { name: string; path: string }[];
   repo: string;
   number: number;
   title: string;

@@ -1,4 +1,7 @@
 {
   "refresh_seconds": 60,
-  "review_labels": {}
+  "review_labels": {},
+  "checkout_paths": [
+    "~/code"
+  ]
 }

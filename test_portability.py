@@ -30,7 +30,7 @@ class PortabilityTests(unittest.TestCase):
   with patch.object(server,'collect_repository',side_effect=collect):server.refresh()
   repos=server.CACHE['data']['repositories']
   self.assertEqual(repos[0]['prs'][0]['repo'],'one/repo')
-  self.assertEqual(repos[1]['prs'],[{'number':4}])
+  self.assertEqual(repos[1]['prs'],[{'number':4,'checkouts':[]}])
   self.assertEqual(repos[1]['error'],'No access')
  def test_account_change_does_not_reuse_old_data(self):
   server.REPOS=['two/repo'];server.AUTHOR='bob'
@@ -42,3 +42,18 @@ class PortabilityTests(unittest.TestCase):
    server.discussion('another/project',42)
    self.assertIn('owner:"another",name:"project"',graph.call_args.args[0])
 if __name__=='__main__':unittest.main()
+
+class DiscoveryRefreshTests(unittest.TestCase):
+ def test_rechecks_known_repositories_missing_from_discovery(self):
+  server.AUTHOR='alice';server.REPOS=[]
+  server.CACHE.update(data={'login':'alice','repositories':[{'name':'one/repo','prs':[{'number':1}],'updatedAt':1,'error':None}]},error=None,refreshing=False)
+  with patch.object(server,'discover_repositories',return_value=[]), patch.object(server,'collect_repository',return_value=[{'number':1}]) as collect:
+   server.refresh()
+  collect.assert_called_once_with('one/repo','alice')
+  self.assertEqual(len(server.CACHE['data']['repositories']),1)
+ def test_removes_missing_repository_when_direct_lookup_confirms_no_prs(self):
+  server.AUTHOR='alice';server.REPOS=[]
+  server.CACHE.update(data={'login':'alice','repositories':[{'name':'one/repo','prs':[{'number':1}],'updatedAt':1,'error':None}]},error=None,refreshing=False)
+  with patch.object(server,'discover_repositories',return_value=[]), patch.object(server,'collect_repository',return_value=[]):
+   server.refresh()
+  self.assertEqual(server.CACHE['data']['repositories'],[])
