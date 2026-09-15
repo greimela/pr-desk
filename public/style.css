@@ -26,3 +26,7 @@ main{padding-top:0}
 .stack-children .pr>div:first-child::before{content:none}
 @media(max-width:700px){.stack-children{margin-left:8px;padding-left:8px}}
 #repositories{min-width:0;overflow-x:auto;flex:1;gap:24px}#repositories button{flex-shrink:0;white-space:nowrap}.toolbar input{flex-shrink:0}
+
+.check-spinner{width:12px;height:12px;flex-shrink:0;border:2px solid currentColor;border-right-color:transparent;border-radius:50%;animation:check-spin .8s linear infinite}
+@keyframes check-spin{to{transform:rotate(360deg)}}
+@media(prefers-reduced-motion:reduce){.check-spinner{animation:none}}
