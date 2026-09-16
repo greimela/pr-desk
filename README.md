@@ -14,27 +14,7 @@ python3 server.py
 
 On Windows, use `python` or `py -3` instead of `python3`.
 
-Open http://127.0.0.1:8765. PR desk automatically discovers repositories containing open PRs authored by the signed-in GitHub user. Discovery runs on every refresh, so repositories appear and disappear as PRs are opened and closed. To view another author, add `--author username`. To change the port, add `--port 9000` or set `PORT`.
-
-To restrict the dashboard to specific repositories, repeat `--repo`:
-
-```sh
-python3 server.py --repo owner/repository --repo owner/another-repository
-```
-
-For saved settings, copy `config.example.json` to `config.json`. This personal config is ignored by Git. If `repos` is omitted or empty, repositories are auto-discovered. `--repo` and `--author` override saved values. Use `--config path/to/config.json` for another config file.
-
-```json
-{
-  "repos": ["your-org/your-repo", "your-org/another-repo"],
-  "refresh_seconds": 60,
-  "review_labels": {
-    "your-org/your-repo": {"security-reviewers": "Security"}
-  }
-}
-```
-
-`repos` and `author` are optional. Omit `repos` to auto-discover repositories and omit `author` to follow the signed-in account. The refresh interval must be at least 30 seconds. Team review requests use their team names by default; `review_labels` can shorten them per repository.
+Open http://127.0.0.1:8765. PR desk automatically discovers repositories containing open PRs authored by the signed-in GitHub user. No repository list or configuration file is needed. Discovery runs on every refresh, so repositories appear and disappear as PRs are opened and closed. To view another author, add `--author username`. To change the port, add `--port 9000` or set `PORT`.
 
 ## Frontend development
 
@@ -66,6 +46,49 @@ Run `pnpm check` for TypeScript, formatting, and lint checks, `pnpm test:fronten
 - General comments have no resolved state on GitHub. Unresolved review threads are counted separately, including Bugbot and human threads.
 
 GitHub.com is supported. Use a CLI account with access to the configured repos. This app does not read Cursor data. Credentials stay with `gh`; no tokens enter the frontend and no PR cache is written to disk. Keep the server local: it binds to loopback and rejects foreign Host/Origin requests. Stop it with Ctrl+C.
+
+## Advanced configuration
+
+No configuration file or repository list is needed for auto-discovery. For saved settings, copy `config.example.json` to `config.json`. This personal config is ignored by Git. Keep `repos` omitted or empty to retain auto-discovery:
+
+```json
+{
+  "refresh_seconds": 60
+}
+```
+
+To view another author, set `author` or pass `--author username`. Omit `author` to follow the signed-in account. The refresh interval must be at least 30 seconds. Use `--config path/to/config.json` for another config file.
+
+### Restrict repositories
+
+To replace auto-discovery with a fixed repository list, repeat `--repo`:
+
+```sh
+python3 server.py --repo owner/repository --repo owner/another-repository
+```
+
+Or save the list in `config.json`:
+
+```json
+{
+  "repos": ["your-org/your-repo", "your-org/another-repo"],
+  "refresh_seconds": 60
+}
+```
+
+`--repo` and `--author` override saved values. Remove `repos` or set it to `[]` to return to auto-discovery.
+
+### Customize review labels
+
+Team review requests use their team names by default. Add `review_labels` to shorten them per repository without restricting auto-discovery:
+
+```json
+{
+  "review_labels": {
+    "your-org/your-repo": {"security-reviewers": "Security"}
+  }
+}
+```
 
 ## Checkout labels
 
