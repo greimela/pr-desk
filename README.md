@@ -1,6 +1,6 @@
 # PR desk
 
-A local, read-only dashboard for your open GitHub pull requests, with one tab per repository. Runs on macOS, Linux, or Windows with Python 3.9+ and the GitHub CLI installed on PATH. The frontend uses React, TypeScript, Tailwind CSS, and TanStack Query, built with Vite+. It requires Node.js 20.19+, 22.18+, or 24.11+ in the supported release lines, plus pnpm 11.18.0 to build.
+A local dashboard for your open GitHub pull requests, with one tab per repository. Runs on macOS, Linux, or Windows with Python 3.9+ and the GitHub CLI installed on PATH. The frontend uses React, TypeScript, Tailwind CSS, and TanStack Query, built with Vite+. It requires Node.js 20.19+, 22.18+, or 24.11+ in the supported release lines, plus pnpm 11.18.0 to build.
 
 ## Run
 
@@ -39,7 +39,7 @@ Run `pnpm check` for TypeScript, formatting, and lint checks, `pnpm test:fronten
 ## Behavior
 
 - The default All tab consolidates every PR. Repository tabs filter the list and show per-repository counts and errors. An inaccessible repo does not stop the others loading.
-- Click a row to inspect checks, reviews, and discussions. Title links open GitHub.
+- Click a row to inspect checks, reviews, and discussions. Title links open GitHub. Failed GitHub Actions checks, including audit failures, have a Retry button that reruns the job and its dependent jobs using your authenticated GitHub CLI account. GitHub requires repository write access. Other check providers do not support retry here.
 - PRs are grouped into stacks when a PR targets another listed PR's branch in the same repository. Children appear below parents; stacks sort by their latest update. Filters show only matching PRs.
 - Individual approvals appear even if a requested team review is still pending. Dismissed approvals are excluded; changes requested take precedence.
 - Failed npm/pnpm audit checks are advisory. Other failures remain red. Pending, skipped, and neutral jobs retain their own status in details.

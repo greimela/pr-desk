@@ -1,5 +1,8 @@
 import { useEffect, useRef, type ReactNode } from "react";
-import { age, bodyText } from "./domain";
+import { age } from "./domain";
+import { CommentMarkdown } from "./CommentMarkdown";
+import { RetryCheck } from "./RetryCheck";
+import { BranchName } from "./BranchName";
 import type { CheckCategory, PullRequest } from "./types";
 import { Badge, SafeLink, ReviewSummary, metaClass, smallClass } from "./ui";
 
@@ -12,11 +15,7 @@ function Section({ title, children }: { title: string; children: ReactNode }) {
   );
 }
 function CommentBox({ children }: { children: ReactNode }) {
-  return (
-    <div className="my-2.5 rounded-lg border border-[#dce2d4] bg-white p-3.5 [&_p]:my-3.5 [&_p]:text-sm [&_p]:leading-relaxed [&_p]:wrap-anywhere [&_p]:whitespace-pre-wrap">
-      {children}
-    </div>
-  );
+  return <div className="my-2.5 rounded-lg border border-[#dce2d4] bg-white p-3.5">{children}</div>;
 }
 const checkOrder: CheckCategory[] = [
   "failed",
@@ -59,7 +58,8 @@ export function PullRequestDetails({ pr: p, onClose }: { pr: PullRequest; onClos
       </div>
       <p className={`${metaClass} mb-3`}>
         <Badge tone="blue">{p.repo}</Badge>
-        {p.headRefName} → {p.baseRefName} · +{p.additions} −{p.deletions} · {p.changedFiles} files
+        <BranchName key={p.headRefName} name={p.headRefName} />→ {p.baseRefName} · +{p.additions} −
+        {p.deletions} · {p.changedFiles} files
       </p>
       <div className={metaClass}>
         <ReviewSummary pr={p} />
@@ -82,7 +82,7 @@ export function PullRequestDetails({ pr: p, onClose }: { pr: PullRequest; onClos
                 </span>
                 {thread.isOutdated && <Badge>Outdated code</Badge>}
               </div>
-              <p>{bodyText(c?.body)}</p>
+              <CommentMarkdown body={c?.body} />
             </CommentBox>
           );
         })}
@@ -97,20 +97,30 @@ export function PullRequestDetails({ pr: p, onClose }: { pr: PullRequest; onClos
               className="flex justify-between gap-[15px] py-2 text-sm"
             >
               <SafeLink url={c.detailsUrl || c.targetUrl}>{c.name || c.context}</SafeLink>
-              <Badge
-                tone={
-                  c.category === "failed"
-                    ? "red"
-                    : ["pending", "advisory"].includes(c.category)
-                      ? "amber"
-                      : c.category === "passed"
-                        ? "green"
-                        : "neutral"
-                }
-                spinning={c.category === "pending"}
-              >
-                {c.category === "advisory" ? "Audit advisory" : c.conclusion || c.status || c.state}
-              </Badge>
+              <div className="flex flex-wrap items-center justify-end gap-2">
+                <RetryCheck
+                  key={c.retryJobId || c.status}
+                  repo={p.repo}
+                  number={p.number}
+                  check={c}
+                />
+                <Badge
+                  tone={
+                    c.category === "failed"
+                      ? "red"
+                      : ["pending", "advisory"].includes(c.category)
+                        ? "amber"
+                        : c.category === "passed"
+                          ? "green"
+                          : "neutral"
+                  }
+                  spinning={c.category === "pending"}
+                >
+                  {c.category === "advisory"
+                    ? "Audit advisory"
+                    : c.conclusion || c.status || c.state}
+                </Badge>
+              </div>
             </div>
           ))}
       </Section>
@@ -122,7 +132,7 @@ export function PullRequestDetails({ pr: p, onClose }: { pr: PullRequest; onClos
               <Badge>{r.state}</Badge>
               <span>{age(r.submittedAt)}</span>
             </div>
-            {r.body && <p>{bodyText(r.body)}</p>}
+            {r.body && <CommentMarkdown body={r.body} />}
           </CommentBox>
         ))}
         {!p.reviews.length && <p className={smallClass}>No submitted reviews.</p>}
@@ -138,7 +148,7 @@ export function PullRequestDetails({ pr: p, onClose }: { pr: PullRequest; onClos
               <SafeLink url={c.url}>{c.author?.login || "Deleted user"}</SafeLink>
               <span>{age(c.createdAt)}</span>
             </div>
-            <p>{bodyText(c.body)}</p>
+            <CommentMarkdown body={c.body} />
           </CommentBox>
         ))}
       </Section>

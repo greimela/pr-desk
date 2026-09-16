@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Read-only, loopback PR dashboard. Python 3 + authenticated gh CLI."""
+"""Loopback PR dashboard. Python 3 + authenticated gh CLI."""
 import argparse, concurrent.futures, json, mimetypes, os, pathlib, re, subprocess, threading, time
 from http.server import ThreadingHTTPServer, BaseHTTPRequestHandler
 from urllib.parse import urlparse
@@ -68,6 +68,20 @@ def check_state(c):
  if value=='SUCCESS': return 'passed'
  if value in ('NEUTRAL','SKIPPED'): return 'neutral'
  return 'unknown'
+def retry_job_id(repo,check):
+ if check.get('status')!='COMPLETED' or check_state(check) not in ('failed','advisory'): return None
+ match=re.fullmatch(r'https://github\.com/'+re.escape(repo)+r'/actions/runs/[0-9]+/job/([0-9]+)(?:\?[^#]*)?',check.get('detailsUrl') or '')
+ return match.group(1) if match else None
+
+def retry_check(repo,number,job_id):
+ if not isinstance(repo,str) or type(number) is not int or not isinstance(job_id,str):
+  raise ValueError('Invalid retry request')
+ with LOCK:
+  prs=[p for r in (CACHE.get('data') or {}).get('repositories',[]) if r['name']==repo for p in r['prs'] if p['number']==number]
+  eligible=any(retry_job_id(repo,c)==job_id for p in prs for c in p['checks'])
+ if not eligible: raise ValueError('Check is unavailable or cannot be retried. Refresh and try again.')
+ run(['gh','api','--method','POST',f'repos/{repo}/actions/jobs/{job_id}/rerun'])
+
 def discover_repositories(login):
  results=gh('search','prs','--author',login,'--state','open','--limit','1000','--json','repository')
  return sorted({p['repository']['nameWithOwner'] for p in results if p.get('repository',{}).get('nameWithOwner')})
@@ -83,6 +97,7 @@ def collect_repository(repo,login):
   p['repo']=repo
   p['reviewLabels']=[REVIEW_LABELS.get(repo,{}).get((r.get('slug') or r.get('name') or '').split('/')[-1],r.get('name') or r.get('slug')) for r in p['reviewRequests'] if r.get('__typename')=='Team']
   p['checks']=[dict(c,category=check_state(c)) for c in p.pop('statusCheckRollup') or []]
+  for c in p['checks']: c['retryJobId']=retry_job_id(repo,c)
   p['unresolved']=[t for t in p['threads'] if not t['isResolved']]
   for t in p['unresolved']:
    author=(t['comments']['nodes'][0].get('author') or {}) if t['comments']['nodes'] else {}
@@ -188,9 +203,23 @@ class Handler(BaseHTTPRequestHandler):
    content=mimetypes.guess_type(file.name)[0] or 'application/octet-stream'
   self.send_response(200); self.send_header('Content-Type',content+'; charset=utf-8'); self.send_header('Cache-Control','no-store'); self.send_header('X-Content-Type-Options','nosniff'); self.send_header('Content-Security-Policy',"default-src 'self'; style-src 'self'; script-src 'self'; img-src 'self' data:; connect-src 'self'; frame-ancestors 'none'"); self.end_headers(); self.wfile.write(body)
  def do_POST(self):
-  if self.path!='/api/refresh' or self.headers.get('Origin') not in (f'http://127.0.0.1:{PORT}',f'http://localhost:{PORT}') or self.headers.get('Host') not in (f'127.0.0.1:{PORT}',f'localhost:{PORT}'):
+  if self.path not in ('/api/refresh','/api/checks/retry') or self.headers.get('Origin') not in (f'http://127.0.0.1:{PORT}',f'http://localhost:{PORT}') or self.headers.get('Host') not in (f'127.0.0.1:{PORT}',f'localhost:{PORT}'):
    self.send_error(403);return
+  if self.path=='/api/checks/retry':
+   try:
+    length=int(self.headers.get('Content-Length','0'))
+    if not 0<length<=4096: raise ValueError('Invalid request size')
+    payload=json.loads(self.rfile.read(length))
+    if not isinstance(payload,dict): raise ValueError('Invalid retry request')
+    retry_check(payload.get('repo'),payload.get('number'),payload.get('jobId'))
+   except (ValueError,UnicodeDecodeError) as e:
+    self.send_json_error(400,str(e));return
+   except Exception as e:
+    self.send_json_error(502,str(e));return
   threading.Thread(target=refresh,daemon=True).start(); self.send_response(202);self.end_headers()
+ def send_json_error(self,status,message):
+  self.send_response(status);self.send_header('Content-Type','application/json');self.end_headers()
+  self.wfile.write(json.dumps({'error':message}).encode())
  def log_message(self,*args): pass
 if __name__=='__main__':
  configure()

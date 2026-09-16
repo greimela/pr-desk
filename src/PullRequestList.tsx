@@ -1,4 +1,5 @@
 import { age, type StackNode } from "./domain";
+import { BranchName } from "./BranchName";
 import type { PullRequest } from "./types";
 import { Badge, SafeLink, ReviewSummary, metaClass, smallClass } from "./ui";
 
@@ -41,9 +42,7 @@ function PullRequestRow({
           {showRepo && <Badge tone="blue">{p.repo}</Badge>}
           <span>#{p.number}</span>
           <span title={new Date(p.updatedAt).toLocaleString()}>Updated {age(p.updatedAt)}</span>
-          <span className="max-w-[310px] truncate font-mono" title={p.headRefName}>
-            {p.headRefName}
-          </span>
+          <BranchName key={p.headRefName} name={p.headRefName} />
           {p.checkouts?.map((checkout) => (
             <span key={checkout.path} title={checkout.path}>
               <Badge tone="blue">{checkout.name}</Badge>

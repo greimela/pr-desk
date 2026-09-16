@@ -15,6 +15,7 @@ export interface Review {
 }
 export type CheckCategory = "failed" | "pending" | "advisory" | "unknown" | "passed" | "neutral";
 export interface Check {
+  retryJobId?: string | null;
   category: CheckCategory;
   name?: string;
   context?: string;

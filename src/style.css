@@ -1,5 +1,87 @@
 @import "tailwindcss";
 
+.comment-markdown {
+  @apply my-3.5 text-sm leading-relaxed wrap-anywhere;
+  & > :first-child {
+    margin-top: 0;
+  }
+  & > :last-child {
+    margin-bottom: 0;
+  }
+  & p,
+  & ul,
+  & ol,
+  & blockquote,
+  & pre,
+  & table {
+    @apply my-3;
+  }
+  & h1,
+  & h2,
+  & h3,
+  & h4,
+  & h5,
+  & h6 {
+    @apply mt-5 mb-2 font-semibold;
+  }
+  & h1 {
+    @apply text-xl;
+  }
+  & h2 {
+    @apply text-lg;
+  }
+  & h3 {
+    @apply text-base;
+  }
+  & ul {
+    @apply list-disc pl-6;
+  }
+  & ol {
+    @apply list-decimal pl-6;
+  }
+  & li > ul,
+  & li > ol {
+    @apply my-1;
+  }
+  & .contains-task-list {
+    @apply list-none;
+  }
+  & input[type="checkbox"] {
+    @apply mr-1.5;
+  }
+  & a {
+    @apply text-[#356b9b] underline;
+  }
+  & blockquote {
+    @apply border-l-4 border-[#d9dfd6] pl-3 text-[#69776b];
+  }
+  & code {
+    @apply rounded bg-[#eef1eb] px-1 py-0.5 font-mono text-[0.85em];
+  }
+  & pre {
+    @apply overflow-x-auto rounded-md bg-[#eef1eb] p-3;
+  }
+  & pre code {
+    @apply bg-transparent p-0 whitespace-pre;
+  }
+  & table {
+    @apply block max-w-full overflow-x-auto border-collapse;
+  }
+  & th,
+  & td {
+    @apply border border-[#d9dfd6] px-3 py-1.5 text-left;
+  }
+  & th {
+    @apply bg-[#eef1eb] font-semibold;
+  }
+  & img {
+    @apply max-w-full rounded;
+  }
+  & hr {
+    @apply my-4 border-[#d9dfd6];
+  }
+}
+
 @layer base {
   :root {
     font-family:
