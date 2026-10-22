@@ -16,11 +16,11 @@ class PortabilityTests(unittest.TestCase):
   ]
   with patch.object(server,'gh',return_value=results) as gh:
    self.assertEqual(server.discover_repositories('alice'),['one/repo','two/repo'])
-  gh.assert_called_once_with('search','prs','--author','alice','--state','open','--limit','1000','--json','repository')
+  gh.assert_called_once_with('search','prs','--author','alice','--state','open','--archived=false','--limit','1000','--json','repository')
  def test_discovers_review_requests_excluding_drafts(self):
   with patch.object(server,'gh',return_value=[{'repository':{'nameWithOwner':'team/repo'}}]) as gh:
    self.assertEqual(server.discover_repositories('alice',reviewer=True),['team/repo'])
-  gh.assert_called_once_with('search','prs','--review-requested','alice','--draft=false','--state','open','--limit','1000','--json','repository')
+  gh.assert_called_once_with('search','prs','--review-requested','alice','--draft=false','--state','open','--archived=false','--limit','1000','--json','repository')
  def test_review_requests_are_published_separately_and_flag_rereviews(self):
   server.REPOS=['one/repo'];server.AUTHOR='alice'
   server.CACHE.update(data=None,refreshing=False,error=None)
@@ -76,15 +76,23 @@ class DiscoveryRefreshTests(unittest.TestCase):
  def test_rechecks_known_repositories_missing_from_discovery(self):
   server.AUTHOR='alice';server.REPOS=[]
   server.CACHE.update(data={'login':'alice','repositories':[{'name':'one/repo','prs':[{'number':1}],'updatedAt':1,'error':None}]},error=None,refreshing=False)
-  with patch.object(server,'discover_repositories',return_value=[]), patch.object(server,'collect_all',return_value=([{'number':1}],[],[],None)) as collect:
+  with patch.object(server,'discover_repositories',return_value=[]), patch.object(server,'gh',return_value={'isArchived':False}), patch.object(server,'collect_all',return_value=([{'number':1}],[],[],None)) as collect:
    server.refresh()
   collect.assert_called_once_with('one/repo','alice',True)
   self.assertEqual(len(server.CACHE['data']['repositories']),1)
  def test_removes_missing_repository_when_direct_lookup_confirms_no_prs(self):
   server.AUTHOR='alice';server.REPOS=[]
   server.CACHE.update(data={'login':'alice','repositories':[{'name':'one/repo','prs':[{'number':1}],'updatedAt':1,'error':None}]},error=None,refreshing=False)
-  with patch.object(server,'discover_repositories',return_value=[]), patch.object(server,'collect_all',return_value=([],[],[],None)):
+  with patch.object(server,'discover_repositories',return_value=[]), patch.object(server,'gh',return_value={'isArchived':False}), patch.object(server,'collect_all',return_value=([],[],[],None)):
    server.refresh()
+  self.assertEqual(server.CACHE['data']['repositories'],[])
+ def test_removes_missing_repository_once_archived(self):
+  server.AUTHOR='alice';server.REPOS=[]
+  server.CACHE.update(data={'login':'alice','repositories':[{'name':'one/repo','prs':[{'number':1}],'updatedAt':1,'error':None}]},error=None,refreshing=False)
+  with patch.object(server,'discover_repositories',return_value=[]), patch.object(server,'gh',return_value={'isArchived':True}) as gh, patch.object(server,'collect_all',return_value=([{'number':1}],[],[],None)) as collect:
+   server.refresh()
+  gh.assert_called_once_with('repo','view','one/repo','--json','isArchived')
+  collect.assert_not_called()
   self.assertEqual(server.CACHE['data']['repositories'],[])
 
 class RateLimitTests(unittest.TestCase):
