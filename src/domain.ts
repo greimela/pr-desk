@@ -14,14 +14,40 @@ export const age = (t?: string | number | null): string => {
         ? Math.floor(n / 60) + "h ago"
         : Math.floor(n / 1440) + "d ago";
 };
-export function approvalState(p: PullRequest) {
-  const latest = new Map();
+export const isStale = (updatedAt: string) =>
+  Date.now() - new Date(updatedAt).getTime() > 7 * 86400000;
+/** A stack is stale only when none of its pull requests changed recently. */
+export const isStaleStack = (node: StackNode): boolean =>
+  isStale(node.pr.updatedAt) && node.children.every(isStaleStack);
+/** Each reviewer's latest decisive review state, keyed by login. */
+function latestReviews(p: PullRequest): Map<string, string> {
+  const latest = new Map<string, string>();
   for (const r of [...p.reviews].sort(
     (a, b) => new Date(a.submittedAt).getTime() - new Date(b.submittedAt).getTime(),
   )) {
     if (r.author?.login && ["APPROVED", "CHANGES_REQUESTED", "DISMISSED"].includes(r.state))
       latest.set(r.author.login, r.state);
   }
+  return latest;
+}
+export function reviewersWith(p: PullRequest, state: "APPROVED" | "CHANGES_REQUESTED"): string[] {
+  return [...latestReviews(p)].filter(([, s]) => s === state).map(([login]) => login);
+}
+/** Hover text naming who approved or requested changes. */
+export function reviewTooltip(p: PullRequest): string | undefined {
+  const lines = [
+    ["Approved by", reviewersWith(p, "APPROVED")],
+    ["Changes requested by", reviewersWith(p, "CHANGES_REQUESTED")],
+  ] as const;
+  return (
+    lines
+      .filter(([, logins]) => logins.length)
+      .map(([label, logins]) => `${label} ${logins.map((l) => `@${l}`).join(", ")}`)
+      .join("\n") || undefined
+  );
+}
+export function approvalState(p: PullRequest) {
+  const latest = latestReviews(p);
   if (
     p.reviewDecision === "CHANGES_REQUESTED" ||
     [...latest.values()].includes("CHANGES_REQUESTED")
@@ -31,6 +57,33 @@ export function approvalState(p: PullRequest) {
     ? "approved"
     : "pending";
 }
+export function isAllGreen(p: PullRequest): boolean {
+  // Checks paused waiting for approval and failed audits don't block a merge.
+  const blocking = ["failed", "pending"];
+  return (
+    !p.isDraft &&
+    p.mergeable !== "CONFLICTING" &&
+    p.checks.length > 0 &&
+    p.checks.every((c) => !blocking.includes(c.category)) &&
+    approvalState(p) === "approved" &&
+    !p.reviewLabels.length &&
+    !p.discussionError &&
+    !p.unresolved.length
+  );
+}
+/** Open for review: published, mergeable, not failing, and still waiting on a reviewer. */
+export function isReadyForReview(p: PullRequest): boolean {
+  const state = approvalState(p);
+  return (
+    !p.isDraft &&
+    p.mergeable !== "CONFLICTING" &&
+    !p.failed &&
+    (state === "pending" || (state === "approved" && p.reviewLabels.length > 0))
+  );
+}
+/** Plain text list of pull requests, one per line, for pasting into a chat. */
+export const reviewListText = (prs: PullRequest[]): string =>
+  prs.map((p) => `- ${p.title}: ${p.url}`).join("\n");
 export function stackPRs(prs: PullRequest[]): StackNode[] {
   const nodes: StackNode[] = prs.map((pr) => ({ pr, children: [] }));
   const parent = new Map<StackNode, StackNode>();
@@ -66,34 +119,6 @@ export function stackPRs(prs: PullRequest[]): StackNode[] {
   return order(nodes.filter((n) => !parent.has(n)));
 }
 
-export const filters = {
-  all: "All open",
-  attention: "Needs attention",
-  failed: "Failing checks",
-  comments: "Open discussions",
-  approved: "Approved",
-} as const;
-export type Filter = keyof typeof filters;
-export function matchesFilter(p: PullRequest, filter: Filter): boolean {
-  switch (filter) {
-    case "all":
-      return true;
-    case "attention":
-      return Boolean(
-        p.reviewLabels.length ||
-        p.failed ||
-        p.unresolved.length ||
-        p.mergeable === "CONFLICTING" ||
-        p.reviewDecision === "CHANGES_REQUESTED",
-      );
-    case "failed":
-      return p.failed > 0;
-    case "comments":
-      return p.unresolved.length > 0;
-    case "approved":
-      return approvalState(p) === "approved";
-  }
-}
 export function bodyText(value?: string): string {
   return (value || "")
     .replace(/<!--[\s\S]*?-->/g, "")

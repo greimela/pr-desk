@@ -1,6 +1,6 @@
 # PR desk
 
-A local dashboard that automatically finds your open GitHub pull requests. Browse by repository, inspect reviews and checks, copy branch names, and retry failed GitHub Actions jobs.
+A local dashboard that automatically finds your open GitHub pull requests and the non-draft pull requests waiting for your review, including requests to your teams. Browse by repository, inspect reviews and checks, copy branch names, and retry failed GitHub Actions jobs.
 
 ## Run
 
@@ -32,8 +32,9 @@ For saved settings, copy `config.example.json` to `config.json`, which is ignore
 | `author` | GitHub username; defaults to the signed-in account. |
 | `repos` | Fixed list of `owner/repository` names. Omit or use `[]` for auto-discovery. |
 | `refresh_seconds` | Refresh interval, default 60, minimum 30. |
-| `checkout_paths` | Local checkouts or their parent directories; matching PRs show the folder name. |
 | `review_labels` | Team label overrides, e.g. `{"owner/repo": {"team-slug": "Label"}}`. |
+| `watch_deployments` | Show the latest deployment while it waits for approval, runs or has failed, and for an hour after it succeeds, e.g. `{"owner/repo": ["prod-mainnet"]}`. |
+| `watch_scheduled_workflows` | Show a banner while the latest finished scheduled run of a workflow has failed, e.g. `{"owner/repo": ["nightly.yml"]}`. |
 
 `--repo` and `--author` override saved settings. Use `--config path/to/config.json` to load another file.
 

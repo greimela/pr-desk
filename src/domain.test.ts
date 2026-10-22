@@ -1,5 +1,14 @@
 import { describe, expect, it } from "vite-plus/test";
-import { approvalState, bodyText, matchesFilter, stackPRs } from "./domain";
+import {
+  approvalState,
+  bodyText,
+  reviewTooltip,
+  isAllGreen,
+  isReadyForReview,
+  reviewListText,
+  isStaleStack,
+  stackPRs,
+} from "./domain";
 import type { PullRequest } from "./types";
 
 function pr(overrides: Partial<PullRequest> = {}): PullRequest {
@@ -43,8 +52,6 @@ describe("review decisions", () => {
   it("shows individual approval while a team review is pending", () => {
     const p = pr({ reviewLabels: ["Security"], reviews: [review("APPROVED", 1)] });
     expect(approvalState(p)).toBe("approved");
-    expect(matchesFilter(p, "attention")).toBe(true);
-    expect(matchesFilter(p, "approved")).toBe(true);
   });
   it("uses the latest decisive review and excludes dismissed approvals", () => {
     expect(approvalState(pr({ reviews: [review("DISMISSED", 3), review("APPROVED", 1)] }))).toBe(
@@ -103,4 +110,79 @@ describe("PR stacks", () => {
 
 it("keeps HTML comments and markup out of discussion text", () => {
   expect(bodyText("Hello<!-- hidden --> <b>world</b>\n\n\nDone")).toBe("Hello world\n\nDone");
+});
+
+describe("all green", () => {
+  const green = {
+    checks: [{ category: "passed" as const }],
+    reviewDecision: "APPROVED",
+  };
+  it("requires passing checks, approval and no open threads", () => {
+    expect(isAllGreen(pr(green))).toBe(true);
+    expect(isAllGreen(pr({ ...green, checks: [] }))).toBe(false);
+    expect(isAllGreen(pr({ ...green, checks: [{ category: "advisory" }] }))).toBe(true);
+    expect(isAllGreen(pr({ ...green, reviewDecision: "" }))).toBe(false);
+    expect(isAllGreen(pr({ ...green, reviewLabels: ["Security"] }))).toBe(false);
+    expect(isAllGreen(pr({ ...green, isDraft: true }))).toBe(false);
+    expect(isAllGreen(pr({ ...green, mergeable: "CONFLICTING" }))).toBe(false);
+    expect(isAllGreen(pr({ ...green, discussionError: "offline" }))).toBe(false);
+  });
+  it("treats checks waiting for approval as passing", () => {
+    expect(
+      isAllGreen(pr({ ...green, checks: [{ category: "passed" }, { category: "waiting" }] })),
+    ).toBe(true);
+    expect(
+      isAllGreen(pr({ ...green, checks: [{ category: "waiting" }, { category: "pending" }] })),
+    ).toBe(false);
+  });
+});
+
+describe("ready for review", () => {
+  it("requires a published, mergeable pull request without failing checks", () => {
+    expect(isReadyForReview(pr())).toBe(true);
+    expect(isReadyForReview(pr({ pending: 1 }))).toBe(true);
+    expect(isReadyForReview(pr({ isDraft: true }))).toBe(false);
+    expect(isReadyForReview(pr({ mergeable: "CONFLICTING" }))).toBe(false);
+    expect(isReadyForReview(pr({ failed: 1 }))).toBe(false);
+  });
+  it("excludes reviewed pull requests unless a team review is still pending", () => {
+    expect(isReadyForReview(pr({ reviewDecision: "APPROVED" }))).toBe(false);
+    expect(isReadyForReview(pr({ reviewDecision: "CHANGES_REQUESTED" }))).toBe(false);
+    expect(isReadyForReview(pr({ reviewDecision: "APPROVED", reviewLabels: ["Security"] }))).toBe(
+      true,
+    );
+  });
+  it("lists one pull request per line", () => {
+    expect(
+      reviewListText([pr(), pr({ number: 2, title: "Another", url: "https://example.com/2" })]),
+    ).toBe(
+      "- A pull request: https://github.com/owner/repo/pull/1\n- Another: https://example.com/2",
+    );
+  });
+});
+
+describe("stale stacks", () => {
+  it("keeps a stack fresh while any pull request in it changed recently", () => {
+    const old = pr({ updatedAt: "2020-01-01T00:00:00Z" });
+    const recent = pr({ number: 2, updatedAt: new Date().toISOString() });
+    expect(isStaleStack({ pr: old, children: [] })).toBe(true);
+    expect(isStaleStack({ pr: old, children: [{ pr: recent, children: [] }] })).toBe(false);
+  });
+});
+
+describe("review tooltip", () => {
+  it("names current approvers and change requesters", () => {
+    const p = pr({
+      reviews: [
+        review("APPROVED", 1, "alice"),
+        review("CHANGES_REQUESTED", 2, "bob"),
+        review("CHANGES_REQUESTED", 1, "carol"),
+        review("APPROVED", 3, "carol"),
+        review("APPROVED", 1, "dave"),
+        review("DISMISSED", 2, "dave"),
+      ],
+    });
+    expect(reviewTooltip(p)).toBe("Approved by @alice, @carol\nChanges requested by @bob");
+    expect(reviewTooltip(pr())).toBeUndefined();
+  });
 });

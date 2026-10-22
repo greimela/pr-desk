@@ -1,7 +1,6 @@
 {
   "refresh_seconds": 60,
   "review_labels": {},
-  "checkout_paths": [
-    "~/code"
-  ]
+  "watch_deployments": {},
+  "watch_scheduled_workflows": {}
 }

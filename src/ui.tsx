@@ -1,5 +1,5 @@
 import type { ReactNode } from "react";
-import { approvalState } from "./domain";
+import { approvalState, reviewTooltip } from "./domain";
 import type { PullRequest } from "./types";
 
 const tones = {
@@ -47,19 +47,50 @@ export function ReviewSummary({ pr }: { pr: PullRequest }) {
   const state = approvalState(pr);
   return (
     <span className="inline-flex flex-wrap items-center gap-[5px]">
-      <Badge tone={state === "approved" ? "green" : state === "changes" ? "red" : "amber"}>
-        {state === "approved"
-          ? "✓ Approved"
-          : state === "changes"
-            ? "Changes requested"
-            : "Pending"}
-      </Badge>
+      {!(pr.isDraft && state === "pending") && (
+        <span title={reviewTooltip(pr)}>
+          <Badge tone={state === "approved" ? "green" : state === "changes" ? "red" : "amber"}>
+            {state === "approved"
+              ? "✓ Approved"
+              : state === "changes"
+                ? "Changes requested"
+                : "Pending"}
+          </Badge>
+        </span>
+      )}
       {pr.reviewLabels.map((label, i) => (
         <Badge key={`${label}-${i}`} tone="amber">
           {label}
         </Badge>
       ))}
     </span>
+  );
+}
+// GitHub Octicons (MIT): git-pull-request and git-pull-request-draft.
+const openIcon =
+  "M1.5 3.25a2.25 2.25 0 1 1 3 2.122v5.256a2.251 2.251 0 1 1-1.5 0V5.372A2.25 2.25 0 0 1 1.5 3.25Zm5.677-.177L9.573.677A.25.25 0 0 1 10 .854V2.5h1A2.5 2.5 0 0 1 13.5 5v5.628a2.251 2.251 0 1 1-1.5 0V5a1 1 0 0 0-1-1h-1v1.646a.25.25 0 0 1-.427.177L7.177 3.427a.25.25 0 0 1 0-.354ZM3.75 2.5a.75.75 0 1 0 0 1.5.75.75 0 0 0 0-1.5Zm0 9.5a.75.75 0 1 0 0 1.5.75.75 0 0 0 0-1.5Zm8.25.75a.75.75 0 1 0 1.5 0 .75.75 0 0 0-1.5 0Z";
+const draftIcon =
+  "M3.25 1A2.25 2.25 0 0 1 4 5.372v5.256a2.251 2.251 0 1 1-1.5 0V5.372A2.251 2.251 0 0 1 3.25 1Zm9.5 14a2.25 2.25 0 1 1 0-4.5 2.25 2.25 0 0 1 0 4.5ZM2.5 3.25a.75.75 0 1 0 1.5 0 .75.75 0 0 0-1.5 0ZM3.25 12a.75.75 0 1 0 0 1.5.75.75 0 0 0 0-1.5Zm9.5 0a.75.75 0 1 0 0 1.5.75.75 0 0 0 0-1.5ZM14 7.5a1.25 1.25 0 1 1-2.5 0 1.25 1.25 0 0 1 2.5 0Zm0-4.25a1.25 1.25 0 1 1-2.5 0 1.25 1.25 0 0 1 2.5 0Z";
+const stateIcons = {
+  draft: { label: "Draft", color: "text-[#7b8578]", path: draftIcon },
+  approved: { label: "Approved", color: "text-[#39713c]", path: openIcon },
+  changes: { label: "Changes requested", color: "text-[#ad4939]", path: openIcon },
+  pending: { label: "Review pending", color: "text-[#966d25]", path: openIcon },
+};
+export function PullRequestStateIcon({ pr }: { pr: PullRequest }) {
+  const { label: state, color, path } = stateIcons[pr.isDraft ? "draft" : approvalState(pr)];
+  const reviewers = reviewTooltip(pr);
+  const label = reviewers ? `${state}\n${reviewers}` : state;
+  return (
+    <svg
+      viewBox="0 0 16 16"
+      role="img"
+      aria-label={label}
+      className={`size-4 shrink-0 fill-current ${color}`}
+    >
+      <title>{label}</title>
+      <path d={path} />
+    </svg>
   );
 }
 export function Empty({ children }: { children: ReactNode }) {

@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 
-export function BranchName({ name }: { name: string }) {
+export function BranchName({ name, iconOnly = false }: { name: string; iconOnly?: boolean }) {
   const [status, setStatus] = useState("");
   const [copying, setCopying] = useState(false);
 
@@ -32,7 +32,7 @@ export function BranchName({ name }: { name: string }) {
           }
         }}
       >
-        <span className="truncate">{name}</span>
+        {!iconOnly && <span className="truncate">{name}</span>}
         <svg
           aria-hidden="true"
           className="size-3.5 shrink-0"

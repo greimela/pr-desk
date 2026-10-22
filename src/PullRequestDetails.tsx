@@ -20,6 +20,7 @@ function CommentBox({ children }: { children: ReactNode }) {
 const checkOrder: CheckCategory[] = [
   "failed",
   "pending",
+  "waiting",
   "advisory",
   "unknown",
   "passed",

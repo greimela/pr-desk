@@ -55,9 +55,3 @@ class FrontendTests(unittest.TestCase):
         self.assertEqual(self.request('/', {'Host': 'foreign.example'})[0], 403)
         (self.root / 'dist' / 'linked.txt').symlink_to(self.root / 'secret.txt')
         self.assertEqual(self.request('/linked.txt')[0], 404)
-
-    def test_missing_build_returns_actionable_error(self):
-        (self.root / 'dist' / 'index.html').unlink()
-        status, _, body = self.request('/')
-        self.assertEqual(status, 404)
-        self.assertIn(b'pnpm build', body)

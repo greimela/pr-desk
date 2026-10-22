@@ -4,14 +4,17 @@ from unittest.mock import patch
 import server
 
 class RefreshLatencyTests(unittest.TestCase):
+ def setUp(self):
+  audit=patch.object(server,'main_branch_audit',return_value={'branch':'main','failures':[]})
+  audit.start(); self.addCleanup(audit.stop)
  def test_fast_repository_publishes_before_slow_repository_finishes(self):
   release=threading.Event()
   fast=threading.Event()
-  def collect(repo,login):
+  def collect(repo,login,full):
    if repo=='slow/repo': release.wait(3)
    else: fast.set()
-   return []
-  with patch.object(server,'REPOS',['slow/repo','fast/repo']),patch.object(server,'AUTHOR','tester'),patch.object(server,'scan_checkouts',return_value=[]),patch.object(server,'collect_repository',side_effect=collect),patch.object(server,'CACHE',{'data':None,'error':None,'refreshing':False}):
+   return [],[],[],None
+  with patch.object(server,'REPOS',['slow/repo','fast/repo']),patch.object(server,'AUTHOR','tester'),patch.object(server,'collect_all',side_effect=collect),patch.object(server,'CACHE',{'data':None,'error':None,'refreshing':False,'rateLimitedUntil':None}):
    worker=threading.Thread(target=server.refresh);worker.start()
    try:
     self.assertTrue(fast.wait(1))
