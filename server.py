@@ -115,7 +115,7 @@ def merge_pull_request(repo,number):
 def discover_repositories(login,reviewer=False):
  # review-requested also matches requests made to the user's teams.
  who=['--review-requested',login,'--draft=false'] if reviewer else ['--author',login]
- results=gh('search','prs',*who,'--state','open','--limit','1000','--json','repository')
+ results=gh('search','prs',*who,'--state','open','--archived=false','--limit','1000','--json','repository')
  return sorted({p['repository']['nameWithOwner'] for p in results if p.get('repository',{}).get('nameWithOwner')})
 READY_DAYS=7
 def list_prs(repo,login,reviewer=False,ready=False):
@@ -214,6 +214,11 @@ def collect_all(repo,login,full=True):
   except Exception as e: audit={'branch':None,'failures':[],'error':str(e)}
  return finish_prs(repo,login,prs),finish_prs(repo,login,reviews,reviewer=True),ready and finish_prs(repo,login,ready),audit
 
+def recheck_all(repo,login,full=True):
+ # Repositories missing from discovery may have been archived since the last refresh.
+ if gh('repo','view',repo,'--json','isArchived')['isArchived']: return [],[],None,None
+ return collect_all(repo,login,full)
+
 def deployment_status(repo,environment):
  """Combined state of the latest deployment to an environment (REST, not GraphQL).
  One release deploys several jobs, so all deployments of the newest commit count together."""
@@ -267,7 +272,7 @@ def refresh(full=False):
   if not REPOS: repos=sorted(discovered | old.keys())
   repositories=[]
   with concurrent.futures.ThreadPoolExecutor(max_workers=3) as pool:
-   futures={repo:pool.submit(collect_all,repo,login,full) for repo in repos}
+   futures={repo:pool.submit(collect_all if REPOS or repo in discovered else recheck_all,repo,login,full) for repo in repos}
    by_future={future:repo for repo,future in futures.items()}
    for future in concurrent.futures.as_completed(by_future):
     repo=by_future[future]
