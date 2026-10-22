@@ -17,6 +17,8 @@ Open [localhost:8765](http://127.0.0.1:8765). Repositories are discovered on eac
 
 On Windows, use `python` or `py -3` instead of `python3`. Stop the server with Ctrl+C.
 
+On macOS, `scripts/install-app.sh` builds the frontend and creates `~/Applications/PR Desk.app`. Opening it starts the server if needed and opens the dashboard in a browser tab. The app stays in the Dock while it runs; click its icon to open another tab, and quit it to stop the server it started. Right-click the Dock icon and choose Options › Keep in Dock for one-click access. The server logs to `~/Library/Logs/pr-desk.log`. Re-run the script after pulling changes. To start the server in the background without the app, run `scripts/open.sh`.
+
 ## Advanced configuration
 
 Use `--author username` to view another author's PRs or `--port 9000` to change the port. To use a fixed repository list instead of auto-discovery:
